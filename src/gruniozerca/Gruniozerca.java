@@ -22,6 +22,7 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
     public float marchewy = 0;
     public boolean pause = false;
     public Timer timer = new Timer(10, this);
+    private boolean direction = true;
     public Gruniozerca()
     {
         JFrame jframe = new JFrame();
@@ -154,6 +155,20 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
         g.fillPolygon( tabX2, tabY2, n2-1 );
     }
 
+    public void paintGrunio(Graphics g, float x, float y)
+    {
+        int x1 = Math.round(x*w - s * 0.07f);
+        int y1 = Math.round(y*h - s * 0.08f);
+        Image grunio;
+        if (direction) {
+            grunio = Toolkit.getDefaultToolkit().getImage("img/gruniop.png");    //Grunio
+        }else{
+            grunio = Toolkit.getDefaultToolkit().getImage("img/gruniol.png");    //Grunio
+        }
+        g.drawImage(grunio, x1, y1, Math.round(s * 0.14f), Math.round(s * 0.08f), null);
+
+    }
+
     public void repaint(Graphics g)
     {
         if (pause) {
@@ -179,7 +194,10 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
             if (!gameOver && started) {
                 g.drawString(String.valueOf(score), WIDTH / 2 - 25, 100);
             }
+
+            paintGrunio(g, 0.5f, 1f);
         }
+
 }
 
     public static void main(String[] args)
@@ -224,6 +242,11 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
 
     @Override
     public void keyPressed(KeyEvent e) {
+        if(e.getKeyCode() == KeyEvent.VK_RIGHT && !pause){
+            direction = true;
+        }else if(e.getKeyCode() == KeyEvent.VK_LEFT && !pause){
+            direction = false;
+        }
 
     }
 
