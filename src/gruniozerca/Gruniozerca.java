@@ -17,6 +17,7 @@ import java.io.*;
 import sun.audio.*;
 import sun.plugin2.liveconnect.JSExceptions;
 
+
 public class Gruniozerca implements MouseListener, KeyListener
 {
     public static Gruniozerca gruniozerca;
@@ -72,6 +73,9 @@ public class Gruniozerca implements MouseListener, KeyListener
         pauseBackground = new ImageIcon("img/pause.jpg").getImage();
         exit = new ImageIcon("img/exit.png").getImage();
 
+
+
+
         //bird = new Rectangle(WIDTH/2 -10, HEIGHT/2 -10, 20,20);
         //columns = new ArrayList<Rectangle>();
 
@@ -119,6 +123,22 @@ public class Gruniozerca implements MouseListener, KeyListener
             if (started && !pause) {
                 ticks++;
                 if (collision()) {
+                    Random generator = new Random();
+                    char liczba = (char)(49+Math.round(generator.nextDouble()*2)); //losowanie char "1", "2" lub "3"
+                    try{
+                        // open the sound file as a Java input stream
+                        String gongFile = "aud/marchew" + liczba + ".wav";
+                        InputStream in = new FileInputStream(gongFile);
+                        AudioStream audioStream = new AudioStream(in);
+                        // create an audiostream from the inputstream
+                        // play the audio clip with the audioplayer class
+                        AudioPlayer.player.start(audioStream);
+                    }catch (FileNotFoundException ex)
+                    {
+                        // insert code to run when exception occurs
+                    }catch (IOException e){
+
+                    }
                     marchewy = 0;
                     score++;
                     czyTrzesienie = true;
