@@ -10,7 +10,6 @@ public class Renderer extends JPanel
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-
         Gruniozerca.gruniozerca.repaint(g);
     }
 }

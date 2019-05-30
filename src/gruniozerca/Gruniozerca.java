@@ -31,6 +31,7 @@ public class Gruniozerca implements MouseListener, KeyListener
     public int w = 800;
     public int h = 600;
     public int s = 600;
+    public float grunioSpeed = 0.004f;              //grunioSpeed dodawane do gruniox w czasie każdego tiknięcia zegara mówi o szybkości przemieszczania Grunia
     public float marchewy = 0;
     public float gruniox = 0.5f;
     public boolean pause = false;
@@ -151,9 +152,9 @@ public class Gruniozerca implements MouseListener, KeyListener
                 }
                 if (run) {
                     if (direction && gruniox <= 1) {
-                        gruniox += 0.004f;
+                        gruniox += grunioSpeed;
                     } else if (gruniox >= 0) {
-                        gruniox -= 0.004f;
+                        gruniox -= grunioSpeed;
                     }
                 }
 
@@ -292,51 +293,30 @@ public class Gruniozerca implements MouseListener, KeyListener
         Image grunio;
         if (run) {
             if (ticks % 50 < 25) {
-                if (direction) {
                     if (czyGrunio) {
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1_r.png");    //Grunio
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1.png");    //Grunio
                     }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1_r.png");    //Grunio
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1.png");    //Grunio
                     }
-                } else {
-                    if(czyGrunio) {
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1_l.png");    //Grunio
-                    }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1_l.png");    //Grunio
-                    }
-                }
             } else {
-                if (direction) {
                     if(czyGrunio){
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2_r.png");    //Grunio
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2.png");    //Grunio
                     }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2_r.png");    //Grunio
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2.png");    //Grunio
                     }
-                } else {
-                    if(czyGrunio) {
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2_l.png");    //Grunio
-                    }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2_l.png");    //Grunio
-                    }
-                }
             }
         }else{
-            if (direction) {
                 if(czyGrunio){
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze_r.png");    //Grunio
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze.png");    //Grunio
                 }else{
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze_r.png");    //Grunio
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze.png");    //Grunio
                 }
-            } else {
-                if(czyGrunio) {
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze_l.png");    //Grunio
-                }else{
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze_l.png");    //Grunio
-                }
-            }
         }
-        g.drawImage(grunio, x1, y1, Math.round(s*0.14f), Math.round(s*0.08f), null);
-
+        if(direction) {
+            g.drawImage(grunio, x1, y1, Math.round(s * 0.14f), Math.round(s * 0.08f), null);
+        }else{
+            g.drawImage(grunio, x1 + Math.round(s * 0.14f), y1, -Math.round(s * 0.14f), Math.round(s * 0.08f), null);
+        }
     }
 
     public void repaint(Graphics g)
