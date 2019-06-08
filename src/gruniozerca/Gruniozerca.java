@@ -31,6 +31,7 @@ public class Gruniozerca implements MouseListener, KeyListener
     public int w = 800;
     public int h = 600;
     public int s = 600;
+    public int timerPeriod = 10;                    //okres timera (w milisekundach)
     public float grunioSpeed = 0.004f;              //grunioSpeed dodawane do gruniox w czasie każdego tiknięcia zegara mówi o szybkości przemieszczania Grunia
     public float marchewy = 0;
     public float gruniox = 0.5f;
@@ -49,6 +50,10 @@ public class Gruniozerca implements MouseListener, KeyListener
     public Timer zegar;
     private boolean direction = true;
     private boolean czySpacja = false;
+
+    randomLevel newLevel;
+    float[][] CarrotsCoordiantes;
+    int numberOfCarrots;
 
     public Gruniozerca()
     {
@@ -74,32 +79,14 @@ public class Gruniozerca implements MouseListener, KeyListener
         pauseBackground = new ImageIcon("img/pause.jpg").getImage();
         exit = new ImageIcon("img/exit.png").getImage();
 
+        newLevel = new randomLevel(3, grunioSpeed, 0.2f);         //losuje nowy poziom o nazwie "newLevel"
 
+        CarrotsCoordiantes = newLevel.getCarrotsCoordiantes();                //tak w ogóle to te trzy linijki powynny być wywoływane na początku nowego poziomu
 
+        numberOfCarrots = newLevel.getCarrotsNumber();
 
-        //bird = new Rectangle(WIDTH/2 -10, HEIGHT/2 -10, 20,20);
-        //columns = new ArrayList<Rectangle>();
-
-        //addColumn(true);
-        //addColumn(true);
-        //addColumn(true);
-        //addColumn(true);
-        //File Clap = new File("aud/zycie.WAV");
-        /*try{
-            Clip clip = AudioSystem.getClip();
-            clip.open(AudioSystem.getAudioInputStream(Clap));
-            clip.start();
-
-            Thread.sleep(clip.getMicrosecondLength()/1000);
-        }catch(Exception e){
-            System.out.print("Cos poszlo nie tak\n");
-        } */
-;
-
-
-        //timer.start();
-        zegar = new Timer();
-        zegar.scheduleAtFixedRate(new Zadanie(),0,10);
+        zegar = new Timer();                                                        //nowy timer
+        zegar.scheduleAtFixedRate(new Zadanie(),0,timerPeriod);
     }
 
 
@@ -123,6 +110,7 @@ public class Gruniozerca implements MouseListener, KeyListener
         public void run() {
             if (started && !pause) {
                 ticks++;
+                /*
                 if (collision()) {
                     Random generator = new Random();
                     char liczba = (char)(49+Math.round(generator.nextDouble()*2)); //losowanie char "1", "2" lub "3"
@@ -145,6 +133,7 @@ public class Gruniozerca implements MouseListener, KeyListener
                     czyTrzesienie = true;
                     ticks = ticks2;
                 }
+                */
                 if (started && marchewy < 1) {
                     marchewy += 0.003f;
                 } else if (started) {
@@ -162,81 +151,7 @@ public class Gruniozerca implements MouseListener, KeyListener
             renderer.repaint();
         }
     }
-/*
-    public void jump()
-    {
-        if(gameOver)
-        {
-            bird = new Rectangle(WIDTH/2 -10, HEIGHT/2 -10, 20,20);
-            columns.clear();
 
-            addColumn(true);
-            addColumn(true);
-            addColumn(true);
-            addColumn(true);
-            gameOver = false;
-        }
-        else if (!gameOver)
-        {
-            if(yMotion > 0)
-            {
-                yMotion = 0;
-            }
-            yMotion -= 10;
-        }
-        if(!started)
-        {
-            started = true;
-        }
-    }
-
- */
-/*
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        ticks++;
-        if (started && marchewy < 1){
-            marchewy += 0.005f;
-        } else if (started) {
-            marchewy = 0;
-            score++;
-        }
-        if (run){
-            if(direction && gruniox <= 1 ){
-                gruniox += 0.005f;
-            }else if (gruniox >= 0){
-                gruniox -= 0.005f;
-            }
-        }
-        renderer.repaint();
-    }
-*/
-/*
-    public void addColumn(boolean start)
-    {
-        int space = 500;
-        int width = 100;
-        int height = 50 + rand.nextInt(300);
-
-        if (start)
-        {
-            columns.add(new Rectangle(WIDTH + width + columns.size()*300, HEIGHT - height - 120, width, height));
-            columns.add(new Rectangle(WIDTH + width + (columns.size()-1)*300, 0, width, HEIGHT - space));
-        }
-        else
-        {
-            columns.add(new Rectangle(columns.get(columns.size() -1).x + 600, HEIGHT - height - 120, width, height));
-            columns.add(new Rectangle(columns.get(columns.size() -1).x , 0, width, HEIGHT - space));
-        }
-}
- */
-/*
-    public void paintColumn(Graphics g, Rectangle column)
-    {
-        g.setColor(Color.green.darker());
-        g.fillRect(column.x, column.y, column.width, column.height);
-    }
-*/
     public void paintCarrot(Graphics g, float x, float y)
     {
         int x1 = Math.round(x*w - s*0.04f/2);
@@ -337,11 +252,26 @@ public class Gruniozerca implements MouseListener, KeyListener
             g.drawString("Click to start!", 75, HEIGHT / 2 - 50);
         }
         else{
+            /*
+            float[][] CarrotsCoordiantes = dupsko.getCarrotsCoordiantes((float)ticks/100f);
+            for(int i = 0; i < dupsko.getCarrotsNumber(); i++){
+                paintCarrot(g, CarrotsCoordiantes[0][i], CarrotsCoordiantes[1][i]);
+            }
+             */
             g.drawImage(background, 0, 0, w, h, null);
             if (czyTrzesienie) trzesienie(g);
             g.drawImage(background, 0, 0, w, h, null);
-            float marchewx = 0.5f;
-            paintCarrot(g, marchewx, marchewy);
+            //float marchewx = 0.5f;
+            float carrotSpeed = newLevel.getCarrotsSpeed();
+            for (int i = 0; i < numberOfCarrots; i++){
+                if (((float) ticks / 100f - CarrotsCoordiantes[1][i]) > 0 && ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]) < 1)
+                {
+                    paintCarrot(g, CarrotsCoordiantes[0][i], (float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]);
+                    //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]));
+                }
+                //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + (CarrotsCoordiantes[1][i] - (float)ticks/100f));
+            }
+            //paintCarrot(g, marchewx, marchewy);
             g.setColor(Color.white);
             g.setFont(new Font("Arial", 1, 100));
 
