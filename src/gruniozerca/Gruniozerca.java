@@ -1,28 +1,60 @@
 package gruniozerca;
 
+import sun.audio.AudioPlayer;
+import sun.audio.AudioStream;
+
+import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.io.File;
+import java.io.*;
+import sun.audio.*;
+import sun.plugin2.liveconnect.JSExceptions;
 
-public class Gruniozerca implements ActionListener, MouseListener, KeyListener
+
+public class Gruniozerca implements MouseListener, KeyListener
 {
     public static Gruniozerca gruniozerca;
     public final int WIDTH = 800, HEIGHT = 639;
     public Renderer renderer;
     public Rectangle bird;
-    public int ticks, yMotion, score = 0;
+    public int ticks, ticks2, score = 0;
     public ArrayList<Rectangle> columns;
     public Random rand;
     public boolean gameOver, started;
     public int w = 800;
     public int h = 600;
     public int s = 600;
+    public int timerPeriod = 10;                    //okres timera (w milisekundach)
+    public float grunioSpeed = 0.004f;              //grunioSpeed dodawane do gruniox w czasie każdego tiknięcia zegara mówi o szybkości przemieszczania Grunia
     public float marchewy = 0;
+    public float gruniox = 0.5f;
     public boolean pause = false;
-    public Timer timer = new Timer(10, this);
+    public boolean run = false;
+    public boolean prawy = false;
+    public boolean lewy = false;
+    public boolean czyGrunio = true;
+    public boolean czyTrzesienie = false;
+
+    public Image background;
+    public Image startBackground;
+    public Image pauseBackground;
+    public Image exit;
+    //public Timer timer = new Timer(20, this);
+    public Timer zegar;
     private boolean direction = true;
+    private boolean czySpacja = false;
+
+    randomLevel newLevel;
+    float[][] CarrotsCoordiantes;
+    int numberOfCarrots;
+
     public Gruniozerca()
     {
         JFrame jframe = new JFrame();
@@ -42,16 +74,21 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
         jframe.setVisible(true);
         jframe.addComponentListener(new ResizeListener());
 
-        bird = new Rectangle(WIDTH/2 -10, HEIGHT/2 -10, 20,20);
-        columns = new ArrayList<Rectangle>();
+        background = new ImageIcon("img/background.jpg").getImage();
+        startBackground = new ImageIcon("img/start.jpg").getImage();
+        pauseBackground = new ImageIcon("img/pause.jpg").getImage();
+        exit = new ImageIcon("img/exit.png").getImage();
 
-        addColumn(true);
-        addColumn(true);
-        addColumn(true);
-        addColumn(true);
+        newLevel = new randomLevel(3, grunioSpeed, 0.2f);         //losuje nowy poziom o nazwie "newLevel"
 
-        timer.start();
+        CarrotsCoordiantes = newLevel.getCarrotsCoordiantes();                //tak w ogóle to te trzy linijki powynny być wywoływane na początku nowego poziomu
+
+        numberOfCarrots = newLevel.getCarrotsNumber();
+
+        zegar = new Timer();                                                        //nowy timer
+        zegar.scheduleAtFixedRate(new Zadanie(),0,timerPeriod);
     }
+
 
     class ResizeListener implements ComponentListener {
 
@@ -68,67 +105,51 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
         }
     }
 
-    public void jump()
-    {
-        if(gameOver)
-        {
-            bird = new Rectangle(WIDTH/2 -10, HEIGHT/2 -10, 20,20);
-            columns.clear();
+    class Zadanie extends TimerTask{
 
-            addColumn(true);
-            addColumn(true);
-            addColumn(true);
-            addColumn(true);
-            gameOver = false;
-        }
-        else if (!gameOver)
-        {
-            if(yMotion > 0)
-            {
-                yMotion = 0;
+        public void run() {
+            if (started && !pause) {
+                ticks++;
+                /*
+                if (collision()) {
+                    Random generator = new Random();
+                    char liczba = (char)(49+Math.round(generator.nextDouble()*2)); //losowanie char "1", "2" lub "3"
+                    try{
+                        // open the sound file as a Java input stream
+                        String gongFile = "aud/marchew" + liczba + ".wav";
+                        InputStream in = new FileInputStream(gongFile);
+                        AudioStream audioStream = new AudioStream(in);
+                        // create an audiostream from the inputstream
+                        // play the audio clip with the audioplayer class
+                        AudioPlayer.player.start(audioStream);
+                    }catch (FileNotFoundException ex)
+                    {
+                        // insert code to run when exception occurs
+                    }catch (IOException e){
+
+                    }
+                    marchewy = 0;
+                    score++;
+                    czyTrzesienie = true;
+                    ticks = ticks2;
+                }
+                */
+                if (started && marchewy < 1) {
+                    marchewy += 0.003f;
+                } else if (started) {
+                    marchewy = 0;
+                }
+                if (run) {
+                    if (direction && gruniox <= 1) {
+                        gruniox += grunioSpeed;
+                    } else if (gruniox >= 0) {
+                        gruniox -= grunioSpeed;
+                    }
+                }
+
             }
-            yMotion -= 10;
+            renderer.repaint();
         }
-        if(!started)
-        {
-            started = true;
-        }
-    }
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        ticks++;
-        if (started && marchewy < 1){
-            marchewy += 0.002f;
-        } else if (started) {
-            marchewy = 0;
-            score++;
-        }
-        renderer.repaint();
-    }
-
-    public void addColumn(boolean start)
-    {
-        int space = 500;
-        int width = 100;
-        int height = 50 + rand.nextInt(300);
-
-        if (start)
-        {
-            columns.add(new Rectangle(WIDTH + width + columns.size()*300, HEIGHT - height - 120, width, height));
-            columns.add(new Rectangle(WIDTH + width + (columns.size()-1)*300, 0, width, HEIGHT - space));
-        }
-        else
-        {
-            columns.add(new Rectangle(columns.get(columns.size() -1).x + 600, HEIGHT - height - 120, width, height));
-            columns.add(new Rectangle(columns.get(columns.size() -1).x , 0, width, HEIGHT - space));
-        }
-}
-
-    public void paintColumn(Graphics g, Rectangle column)
-    {
-        g.setColor(Color.green.darker());
-        g.fillRect(column.x, column.y, column.width, column.height);
     }
 
     public void paintCarrot(Graphics g, float x, float y)
@@ -155,38 +176,104 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
         g.fillPolygon( tabX2, tabY2, n2-1 );
     }
 
+    public boolean collision()
+    {
+        Rectangle r1 = new Rectangle(Math.round(gruniox*w - s * 0.07f), Math.round(h * 0.74f), Math.round(s * 0.14f), Math.round(s * 0.08f));
+        Rectangle r2 = new Rectangle(Math.round(w * 0.5f - s*0.04f/2), Math.round(h * marchewy - s*0.11f), Math.round(s*0.04f), Math.round(s*0.11f));
+        if(r1.intersects(r2)){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public void trzesienie(Graphics g){
+        if (ticks-ticks2 % 30 < 5){
+            g.translate(0, Math.round(-h * 0.01f));
+        }else if (ticks-ticks2 % 30 < 12){
+            g.translate(0, Math.round(h * 0.01f));
+        }else if(ticks-ticks2 % 30 < 20) {
+            g.translate(0, Math.round(-h * 0.01f));
+        }else if(ticks-ticks2 % 30 < 29) {
+            g.translate(0, Math.round(h * 0.01f));
+        }else{
+            czyTrzesienie = false;
+        }
+    }
+
     public void paintGrunio(Graphics g, float x, float y)
     {
         int x1 = Math.round(x*w - s * 0.07f);
         int y1 = Math.round(y*h - s * 0.08f);
         Image grunio;
-        if (direction) {
-            grunio = Toolkit.getDefaultToolkit().getImage("img/gruniop.png");    //Grunio
+        if (run) {
+            if (ticks % 50 < 25) {
+                    if (czyGrunio) {
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1.png");    //Grunio
+                    }else{
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1.png");    //Grunio
+                    }
+            } else {
+                    if(czyGrunio){
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2.png");    //Grunio
+                    }else{
+                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2.png");    //Grunio
+                    }
+            }
         }else{
-            grunio = Toolkit.getDefaultToolkit().getImage("img/gruniol.png");    //Grunio
+                if(czyGrunio){
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze.png");    //Grunio
+                }else{
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze.png");    //Grunio
+                }
         }
-        g.drawImage(grunio, x1, y1, Math.round(s * 0.14f), Math.round(s * 0.08f), null);
-
+        if(direction) {
+            g.drawImage(grunio, x1, y1, Math.round(s * 0.14f), Math.round(s * 0.08f), null);
+        }else{
+            g.drawImage(grunio, x1 + Math.round(s * 0.14f), y1, -Math.round(s * 0.14f), Math.round(s * 0.08f), null);
+        }
     }
 
     public void repaint(Graphics g)
     {
         if (pause) {
-            g.setColor(Color.red);
-            g.fillRect( Math.round((w-s * 0.7f)/2),  Math.round(h/2), Math.round(s * 0.7f), Math.round(h * 0.15f));
+            g.drawImage(pauseBackground, 0, 0, w, h, null);
+            g.drawImage(exit, Math.round((w-s * 0.7f)/2),  Math.round(h*0.75f), Math.round(s * 0.7f), Math.round(h * 0.2f), null);
+            //g.setColor(Color.red);
+            //g.fillRect( Math.round((w-s * 0.7f)/2),  Math.round(h/2), Math.round(s * 0.7f), Math.round(h * 0.15f));
             g.setColor(Color.white);
             g.setFont(new Font("Arial", 1, Math.round(s * 0.14f)));
-            g.drawString("WYJŚCIE", Math.round((w-s * 0.7f)/2 + s * 0.03f), Math.round(h/2 + s * 0.14f));
+            //g.drawString("WYJŚCIE", Math.round((w-s * 0.7f)/2 + s * 0.03f), Math.round(h/2 + s * 0.14f));
             g.drawString("PAUZA", Math.round((w-s * 0.5f)/2), Math.round(s * 0.14f));
-        }else {
-            float marchewx = 0.5f;
-            paintCarrot(g, marchewx, marchewy);
+        }else if (!started){
+            g.drawImage(startBackground, 0, 0, w, h, null);
             g.setColor(Color.white);
             g.setFont(new Font("Arial", 1, 100));
-
-            if (!started) {
-                g.drawString("Click to start!", 75, HEIGHT / 2 - 50);
+            g.drawString("Click to start!", 75, HEIGHT / 2 - 50);
+        }
+        else{
+            /*
+            float[][] CarrotsCoordiantes = dupsko.getCarrotsCoordiantes((float)ticks/100f);
+            for(int i = 0; i < dupsko.getCarrotsNumber(); i++){
+                paintCarrot(g, CarrotsCoordiantes[0][i], CarrotsCoordiantes[1][i]);
             }
+             */
+            g.drawImage(background, 0, 0, w, h, null);
+            if (czyTrzesienie) trzesienie(g);
+            g.drawImage(background, 0, 0, w, h, null);
+            //float marchewx = 0.5f;
+            float carrotSpeed = newLevel.getCarrotsSpeed();
+            for (int i = 0; i < numberOfCarrots; i++){
+                if (((float) ticks / 100f - CarrotsCoordiantes[1][i]) > 0 && ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]) < 1)
+                {
+                    paintCarrot(g, CarrotsCoordiantes[0][i], (float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]);
+                    //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]));
+                }
+                //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + (CarrotsCoordiantes[1][i] - (float)ticks/100f));
+            }
+            //paintCarrot(g, marchewx, marchewy);
+            g.setColor(Color.white);
+            g.setFont(new Font("Arial", 1, 100));
 
             if (gameOver) {
                 g.drawString("Game over!", 100, HEIGHT / 2 - 50);
@@ -195,7 +282,7 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
                 g.drawString(String.valueOf(score), WIDTH / 2 - 25, 100);
             }
 
-            paintGrunio(g, 0.5f, 1f);
+            paintGrunio(g, gruniox, 0.82f);
         }
 
 }
@@ -208,11 +295,12 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
     @Override
     public void mouseClicked(MouseEvent e) {
         if (pause){
-            if ( e.getX() < Math.round((w-s * 0.7f)/2) + Math.round(s * 0.7f) && e.getX() >  Math.round((w-s * 0.7f)/2) && e.getY() < Math.round(h/2) + Math.round(s * 0.15f) && e.getY() > Math.round(h/2) ){
+            if ( e.getX() < Math.round((w-s * 0.7f)/2) + Math.round(s * 0.7f) && e.getX() >  Math.round((w-s * 0.7f)/2) && e.getY() < Math.round(h*0.75f) + Math.round(s * 0.2f) && e.getY() > Math.round(h*0.75f) ){
                 System.exit(0);
             }
         }
-        else jump();
+        gameOver = false;
+        started = true;
     }
 
     @Override
@@ -243,26 +331,56 @@ public class Gruniozerca implements ActionListener, MouseListener, KeyListener
     @Override
     public void keyPressed(KeyEvent e) {
         if(e.getKeyCode() == KeyEvent.VK_RIGHT && !pause){
+            run = true;
             direction = true;
-        }else if(e.getKeyCode() == KeyEvent.VK_LEFT && !pause){
+            prawy = true;
+        }else if(e.getKeyCode() == KeyEvent.VK_LEFT && !pause) {
+            run = true;
             direction = false;
+            lewy = true;
         }
-
+        if (lewy && prawy){
+            run = false;
+        }
+        if(e.getKeyCode() == KeyEvent.VK_SPACE)
+        {
+            if(!czySpacja){
+                czyGrunio = !czyGrunio;
+                czySpacja = true;
+            }
+        }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
+        if(e.getKeyCode() == KeyEvent.VK_RIGHT){
+            run = false;
+            prawy = false;
+        }
+        if(e.getKeyCode() == KeyEvent.VK_LEFT){
+            run = false;
+            lewy = false;
+        }
+        if(prawy && !lewy){
+            run = true;
+            direction = true;
+        }else if(lewy && !prawy){
+            run = true;
+            direction = false;
+        }
 
         if(e.getKeyCode() == KeyEvent.VK_SPACE)
         {
-            jump();
+            //jump();
+            czySpacja = false;
+
         }
 
         if(e.getKeyCode() == KeyEvent.VK_ESCAPE && started)
         {
             pause = !pause;
-            if (pause) timer.stop();
-            else timer.start();
+            //if (pause) timer.stop();
+            //else timer.start();
             renderer.repaint();
         }
     }
