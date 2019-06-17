@@ -2,21 +2,22 @@ package gruniozerca;
 
 import java.util.Random;
 
-public class randomLevel {
-    float carrotSpeed;
-    int numberOfCarrots;
-    boolean[] colors;
-    float[] carrotX;
-    float[] carrotY;
-    float levelHeight;
+import static java.lang.Math.sqrt;
+
+
+class randomLevel {
+    private float carrotSpeed;
+    private int numberOfCarrots;
+    private boolean[] colors;
+    private float[] carrotX;
+    public float[] carrotY;
     //int j;
-    public randomLevel(int level, float grunioSpeed, float levelH)       //Tu mogłem dać jakieś komentarze xd
+    randomLevel(int level, float grunioSpeed, float levelH)       //Tu mogłem dać jakieś komentarze xd
     {
-        levelHeight = levelH;
-        carrotSpeed = level*0.0015f;
-        if (carrotSpeed > 0.02) carrotSpeed = 0.02f;
+        carrotSpeed = (float)(sqrt(level))*0.003f;
+        if (carrotSpeed > 0.04) carrotSpeed = 0.04f;
         numberOfCarrots = level * 5;
-        if (level > 2) colors = carrotColor(numberOfCarrots);               //jak poziom > 2 to wszystkie marchewki czerwone inaczej losowo
+        if (level > 1) colors = carrotColor(numberOfCarrots);               //jak poziom <= 1 to wszystkie marchewki czerwone inaczej losowo
         else {
             colors = new boolean[numberOfCarrots];
             for (int i = 0; i < numberOfCarrots; i++){
@@ -28,9 +29,9 @@ public class randomLevel {
             carrotX[i] = (float)Math.random();
         }
         carrotY = new float[numberOfCarrots];                       //a tutaj w osi y pozycja marchewek, tak żeby się dało dobiec
-        float levelY = 0.5f - level * 0.01f;                                //im większy poziom to tym mniejsze odstępy w osi y będą miedzy marchewami
+        float levelY = 0.4f - level * 0.05f;                                //im większy poziom to tym mniejsze odstępy w osi y będą miedzy marchewami
         if (levelY < 0.01f) levelY = 0.01f;
-        carrotY[0] = levelHeight + levelY + (float)Math.random() * levelY + (Math.abs(carrotX[0] - 0.5f) * grunioSpeed) / carrotSpeed;
+        carrotY[0] = levelH + levelY + (float)Math.random() * levelY + (Math.abs(carrotX[0] - 0.5f) * grunioSpeed) / carrotSpeed;
         for (int i = 1; i < numberOfCarrots; i++){
             carrotY[i] = carrotY[i-1] + levelY + (float)Math.random() * levelY + (Math.abs(carrotX[i] - carrotX[i - 1]) * grunioSpeed) / carrotSpeed;
         }
@@ -41,40 +42,34 @@ public class randomLevel {
     {
         Random generator = new Random();
         boolean[] table = new boolean[length];
-        for(int i = 0; i < length; i++){
-            if(Math.round(generator.nextDouble()) == 1) table[i] = true;
-            else table[i] = false;
-        }
+        for(int i = 0; i < length; i++)
+            if (Math.round(generator.nextDouble()) == 1) {
+                table[i] = true;
+            } else table[i] = false;
         return table;
     }
 
-    public float[][] getCarrotsCoordiantes()                        //zwraca koordynaty marchewek w tabeli 2 na ilość
+    boolean[] getCarrotColor()
     {
-        float[][] CarrotsCoordiantes = new float[2][numberOfCarrots];
-        /*
-        j = 0;
-        for (int i = 0; i < numberOfCarrots; i++){
-            if(carrotY[i] > (pastY-levelHeight) && carrotY[i] < (pastY-levelHeight+1)){
-                CarrotsCoordiantes[0][i] = carrotX[j];
-                CarrotsCoordiantes[1][i] = carrotY[j]-pastY;
-                j++;
-            }
-        }
-         */
-        for (int i = 0; i < numberOfCarrots; i++){
-            CarrotsCoordiantes[0][i] = carrotX[i];
-            CarrotsCoordiantes[1][i] = carrotY[i];
-            //System.out.print("i=" + i + " x=" + carrotX[i] + " y=" + carrotY[i] + "\n");
-        }
-        return CarrotsCoordiantes;
+        return colors;
     }
 
-    public int getCarrotsNumber()           //zwraca ilość marchewek (długość tabeli)
+    float[][] getCarrotsCoordinates()                        //zwraca koordynaty marchewek w tabeli 2 na ilość
+    {
+        float[][] CarrotsCoordinates = new float[2][numberOfCarrots];
+        for (int i = 0; i < numberOfCarrots; i++){
+            CarrotsCoordinates[0][i] = carrotX[i];
+            CarrotsCoordinates[1][i] = carrotY[i];
+        }
+        return CarrotsCoordinates;
+    }
+
+    int getCarrotsNumber()           //zwraca ilość marchewek (długość tabeli)
     {
         return numberOfCarrots;
     }
 
-    public float getCarrotsSpeed()          //zwraca szybkość marchewek
+    float getCarrotsSpeed()          //zwraca szybkość marchewek
     {
         return carrotSpeed;
     }

@@ -3,64 +3,76 @@ package gruniozerca;
 import sun.audio.AudioPlayer;
 import sun.audio.AudioStream;
 
+import java.util.*;
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.io.File;
 import java.io.*;
-import sun.audio.*;
-import sun.plugin2.liveconnect.JSExceptions;
+import java.util.Timer;
 
 
 public class Gruniozerca implements MouseListener, KeyListener
 {
-    public static Gruniozerca gruniozerca;
-    public final int WIDTH = 800, HEIGHT = 639;
-    public Renderer renderer;
-    public Rectangle bird;
-    public int ticks, ticks2, score = 0;
-    public ArrayList<Rectangle> columns;
-    public Random rand;
-    public boolean gameOver, started;
-    public int w = 800;
-    public int h = 600;
-    public int s = 600;
-    public int timerPeriod = 10;                    //okres timera (w milisekundach)
-    public float grunioSpeed = 0.004f;              //grunioSpeed dodawane do gruniox w czasie każdego tiknięcia zegara mówi o szybkości przemieszczania Grunia
-    public float marchewy = 0;
-    public float gruniox = 0.5f;
-    public boolean pause = false;
-    public boolean run = false;
-    public boolean prawy = false;
-    public boolean lewy = false;
-    public boolean czyGrunio = true;
-    public boolean czyTrzesienie = false;
+    static Gruniozerca gruniozerca;
+    private Renderer renderer;
+    private int ticks, score = 0;
+    private int ticks2 = -1;
+    private boolean gameOver, started;
+    private int w = 800;
+    private int h = 600;
+    private int s = 600;
+    private float grunioSpeed = 0.008f;     //grunioSpeed dodawane do gruniox w czasie każdego tiknięcia zegara mówi o szybkości przemieszczania Grunia
+    private float carroty = 0;
+    private float gruniox = 0.5f;           //początkowe położenie Grunia
+    private boolean pause = false;
+    private boolean run = false;
+    private boolean right = false;
+    private boolean left = false;
+    private boolean isGrunioBlack = true;
+    private boolean isQuake = false;
+    private boolean isRoundEnd = false;
+    private boolean isDead = false;
+    private boolean isRepeat = false;
+    private int level = 1;                  //Początkowy poziom
+    private int lives = 3;
 
-    public Image background;
-    public Image startBackground;
-    public Image pauseBackground;
-    public Image exit;
-    //public Timer timer = new Timer(20, this);
-    public Timer zegar;
+    private Image startBackground;
+    private Image pauseBackground;
+    private Image exit;
+    private Image next;
+    private Image heartRed;
+    private Image heartGrey;
+    private Image hospital;
+    private Image logo;
+    private Image holiday;
+    private Image repeat;
     private boolean direction = true;
     private boolean czySpacja = false;
 
-    randomLevel newLevel;
-    float[][] CarrotsCoordiantes;
-    int numberOfCarrots;
+    private Cursor blankCursor;
+    private JFrame jframe;
 
-    public Gruniozerca()
+    private randomLevel newLevel;
+    private float[][] CarrotsCoordinates;
+    private boolean[] isColor;
+    private boolean[] isAte;
+    private int numberOfCarrots;
+    private Queue<Float> historyGrunioX;        //kolejki potrzebne do odtwarzania rozgrywki
+    private Queue<Float> historyCarrotY;
+    private Queue<Boolean> historyDirection;
+    private Queue<Boolean> historyRun;
+    private Queue<Boolean> historyColor;
+
+    private Gruniozerca()
     {
-        JFrame jframe = new JFrame();
+        final int WIDTH = 800, HEIGHT = 639;
+        jframe = new JFrame();
 
         renderer = new Renderer();
-        rand = new Random();
 
         jframe.add(renderer);
         jframe.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -74,19 +86,61 @@ public class Gruniozerca implements MouseListener, KeyListener
         jframe.setVisible(true);
         jframe.addComponentListener(new ResizeListener());
 
-        background = new ImageIcon("img/background.jpg").getImage();
+        try{
+            String gongFile = "aud/theme.wav";      // audio które gra w tle (zapętlone)
+            File musicPath = new File(gongFile);
+            if(musicPath.exists()) {
+                AudioInputStream audioInput = AudioSystem.getAudioInputStream(musicPath);
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioInput);
+                clip.start();
+                clip.loop(Clip.LOOP_CONTINUOUSLY);
+            }
+        }catch (FileNotFoundException ex)
+        {
+            System.out.println("Audio Error");
+        }catch (IOException e) {
+
+        } catch (UnsupportedAudioFileException e) {
+            e.printStackTrace();
+        } catch (LineUnavailableException e) {
+            e.printStackTrace();
+        }
+
         startBackground = new ImageIcon("img/start.jpg").getImage();
         pauseBackground = new ImageIcon("img/pause.jpg").getImage();
         exit = new ImageIcon("img/exit.png").getImage();
+        next = new ImageIcon("img/next.png").getImage();
+        heartRed = new ImageIcon("img/heartRed.png").getImage();
+        heartGrey = new ImageIcon("img/heartGrey.png").getImage();
+        hospital = new ImageIcon("img/hospital.jpg").getImage();
+        logo = new ImageIcon("img/logo.png").getImage();
+        holiday = new ImageIcon("img/holiday.jpg").getImage();
+        repeat = new ImageIcon("img/replay.jpg").getImage();
 
-        newLevel = new randomLevel(3, grunioSpeed, 0.2f);         //losuje nowy poziom o nazwie "newLevel"
+        historyGrunioX = new LinkedList<>();    // kolejka do zapisywania pozycji x Grunia
+        historyColor = new LinkedList<>();      // kolejka -- kolorów Grunia
+        historyDirection = new LinkedList<>();  // kolejka -- kierunku Grunia
+        historyRun = new LinkedList<>();        // kolejka -- ruchu Grunia
+        historyCarrotY = new LinkedList<>();    // kolejka -- marchewek Y
 
-        CarrotsCoordiantes = newLevel.getCarrotsCoordiantes();                //tak w ogóle to te trzy linijki powynny być wywoływane na początku nowego poziomu
+        BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
+                cursorImg, new Point(0, 0), "blank cursor");    // stworzenie niewidzialnego kursora myszy
+        jframe.getContentPane().setCursor(blankCursor);
+
+        newLevel = new randomLevel(level, grunioSpeed, 0.2f);         //losuje nowy poziom o nazwie "newLevel"
+
+        CarrotsCoordinates = newLevel.getCarrotsCoordinates();                //tak w ogóle to te trzy linijki powynny być wywoływane na początku nowego poziomu
+        isColor = newLevel.getCarrotColor();
 
         numberOfCarrots = newLevel.getCarrotsNumber();
+        isAte = new boolean[numberOfCarrots];                      // tablica zjedzonych lub opuszczonych marchewek ????
+        for(int i = 0; i < numberOfCarrots; i++) isAte[i] = false; // na poczatku zadna nie jest zjedzona wiec wszystkie na false
 
-        zegar = new Timer();                                                        //nowy timer
-        zegar.scheduleAtFixedRate(new Zadanie(),0,timerPeriod);
+        int timerPeriod = 20;                    //okres timera (w milisekundach)
+        Timer clock = new Timer();               //nowy timer
+        clock.scheduleAtFixedRate(new Exercise(),0,timerPeriod);
     }
 
 
@@ -101,43 +155,40 @@ public class Gruniozerca implements MouseListener, KeyListener
             h = newSize.height;
             w = newSize.width;
             s = Math.min(h,w);
-            //System.out.print("Wysokosc: " + h + " Szerokosc: " + w + "\n");
         }
     }
 
-    class Zadanie extends TimerTask{
+    class Exercise extends TimerTask{
 
         public void run() {
-            if (started && !pause) {
+            if (started && !pause && !isRoundEnd && !isDead) {
                 ticks++;
-                /*
-                if (collision()) {
+                historyGrunioX.add(gruniox);        // dopisywanie do kolejek danych
+                historyDirection.add(direction);    // potrzebnych do mozliwosci
+                historyRun.add(run);                // odtworzenia poprzedniego etapu gry
+                historyColor.add(isGrunioBlack);
+
+
+                // dzwiek chrupania marchewki
+                if ((ticks - ticks2) == 1) {
                     Random generator = new Random();
-                    char liczba = (char)(49+Math.round(generator.nextDouble()*2)); //losowanie char "1", "2" lub "3"
+                    char audioFileNumber = (char)(49+Math.round(generator.nextDouble()*2)); //losowanie char "1", "2" lub "3"
                     try{
-                        // open the sound file as a Java input stream
-                        String gongFile = "aud/marchew" + liczba + ".wav";
+                        String gongFile = "aud/marchew" + audioFileNumber + ".wav";
                         InputStream in = new FileInputStream(gongFile);
                         AudioStream audioStream = new AudioStream(in);
-                        // create an audiostream from the inputstream
-                        // play the audio clip with the audioplayer class
                         AudioPlayer.player.start(audioStream);
                     }catch (FileNotFoundException ex)
                     {
-                        // insert code to run when exception occurs
-                    }catch (IOException e){
+                        System.out.println("Audio Error");
+                    }catch (IOException e) {
 
                     }
-                    marchewy = 0;
-                    score++;
-                    czyTrzesienie = true;
-                    ticks = ticks2;
                 }
-                */
-                if (started && marchewy < 1) {
-                    marchewy += 0.003f;
+                if (started && carroty < 1) {
+                    carroty += 0.003f;
                 } else if (started) {
-                    marchewy = 0;
+                    carroty = 0;
                 }
                 if (run) {
                     if (direction && gruniox <= 1) {
@@ -152,18 +203,26 @@ public class Gruniozerca implements MouseListener, KeyListener
         }
     }
 
-    public void paintCarrot(Graphics g, float x, float y)
+    // ============== STWORZENIE SZABLONU MARCHEWKI + RYSOWANIE ===========================
+
+    private void paintCarrot(Graphics g, float x, float y, boolean isColor)
     {
         int x1 = Math.round(x*w - s*0.04f/2);
         int y1 = Math.round(y*h - s*0.11f);
-        g.setColor(Color.orange);
-        int tabX [ ] = { x1 + 0 , x1 + Math.round(s*0.04f) , x1 + Math.round(s*0.03f) , x1 + Math.round(s*0.01f) , x1 + 0 };
+        Color color1 = new Color(227, 164, 0);
+        Color color2 = new Color(255, 231, 140, 255);
+        if(isColor){
+            color1 = new Color(255, 59, 0);
+            color2 = new Color(255, 185, 137, 255);
+        }
+        g.setColor(color1);
+        int tabX [ ] = { x1 , x1 + Math.round(s*0.04f) , x1 + Math.round(s*0.03f) , x1 + Math.round(s*0.01f) , x1};
         int tabY [ ] = { y1 + Math.round(s*0.05f) , y1 + Math.round(s*0.05f) , y1 + Math.round(s*0.1f) , y1 + Math.round(s*0.1f) , y1 + Math.round(s*0.05f) };
         int n = tabX.length;
         g.fillPolygon( tabX, tabY, n-1 );
-        g.fillOval(  x1 + 0 , y1 + Math.round(s*0.03f), Math.round(s*0.04f), Math.round(s*0.04f) );
+        g.fillOval(  x1 , y1 + Math.round(s*0.03f), Math.round(s*0.04f), Math.round(s*0.04f) );
         g.fillOval(  x1 + Math.round(s*0.01f) , y1 + Math.round(s*0.09f), Math.round(s*0.02f), Math.round(s*0.02f) );
-        g.setColor(Color.orange.brighter());
+        g.setColor(color2);
         int tabX1 [ ] = { x1 + Math.round(s*0.02f) , x1 + Math.round(s*0.03f) , x1 + Math.round(s*0.02f) , x1 + Math.round(s*0.02f) };
         int tabY1 [ ] = { y1 + Math.round(s*0.055f) , y1 + Math.round(s*0.055f) , y1 + Math.round(s*0.095f) , y1 + Math.round(s*0.055f) };
         int n1 = tabX1.length;
@@ -171,61 +230,83 @@ public class Gruniozerca implements MouseListener, KeyListener
         g.fillOval(  x1 + Math.round(s*0.02f) , y1 + Math.round(s*0.05f), Math.round(s*0.01f), Math.round(s*0.01f) );
         g.setColor(Color.green);
         int tabX2 [ ] = { x1 + Math.round(s*0.02f) , x1 + Math.round(s*0.005f) , x1 + Math.round(s*0.015f) , x1 + Math.round(s*0.02f) , x1 + Math.round(s*0.025f) , x1 + Math.round(s*0.035f) , x1 + Math.round(s*0.02f) };
-        int tabY2 [ ] = { y1 + Math.round(s*0.03f) , y1 + Math.round(s*0.005f) , y1 + Math.round(s*0.01f) , y1 + 0 , y1 + Math.round(s*0.01f) , y1 + Math.round(s*0.005f) , y1 + Math.round(s*0.03f)  };
+        int tabY2 [ ] = { y1 + Math.round(s*0.03f) , y1 + Math.round(s*0.005f) , y1 + Math.round(s*0.01f) , y1, y1 + Math.round(s*0.01f) , y1 + Math.round(s*0.005f) , y1 + Math.round(s*0.03f)  };
         int n2 = tabX2.length;
         g.fillPolygon( tabX2, tabY2, n2-1 );
     }
 
-    public boolean collision()
-    {
-        Rectangle r1 = new Rectangle(Math.round(gruniox*w - s * 0.07f), Math.round(h * 0.74f), Math.round(s * 0.14f), Math.round(s * 0.08f));
-        Rectangle r2 = new Rectangle(Math.round(w * 0.5f - s*0.04f/2), Math.round(h * marchewy - s*0.11f), Math.round(s*0.04f), Math.round(s*0.11f));
-        if(r1.intersects(r2)){
+    // ================== WYKRYWANIE KOLIZJI DWOCH KLAS RECTANGLE (GRUNIA + MARCHEWEK) ===============================
+
+    private boolean collision(float carrotX, float carrotY, boolean isColor) {
+        Rectangle r1 = new Rectangle(Math.round(gruniox * w - s * 0.07f), Math.round(h * 0.74f), Math.round(s * 0.14f), Math.round(s * 0.08f));
+        Rectangle r2 = new Rectangle(Math.round(w * carrotX - s * 0.04f / 2), Math.round(h * carrotY - s * 0.11f), Math.round(s * 0.04f), Math.round(s * 0.11f));
+        if (r1.intersects(r2) && isColor == isGrunioBlack) {
+            if(!isRepeat) score++;
+            isQuake = true;
+            ticks2 = ticks;
+            return true;
+        }else if(r1.intersects(r2) && isColor != isGrunioBlack) {
+            try{
+                String gongFile = "aud/lose.wav";
+                InputStream in = new FileInputStream(gongFile);
+                AudioStream audioStream = new AudioStream(in);
+                AudioPlayer.player.start(audioStream);
+            }catch (FileNotFoundException ex)
+            {
+                System.out.println("Audio Error");
+            }catch (IOException e) {
+
+            }
+            lives--;
+            if(lives <= 0) isDead = true;
             return true;
         }else{
             return false;
         }
     }
 
-    public void trzesienie(Graphics g){
-        if (ticks-ticks2 % 30 < 5){
+    // ==================== TRANSLACJA OBRAZU POWODUJACA TRZESIENIE =======================
+
+    private void quake(Graphics g){
+        if ((ticks-ticks2) % 15 < 3){
             g.translate(0, Math.round(-h * 0.01f));
-        }else if (ticks-ticks2 % 30 < 12){
+        }else if ((ticks-ticks2) % 15 < 6){
             g.translate(0, Math.round(h * 0.01f));
-        }else if(ticks-ticks2 % 30 < 20) {
+        }else if((ticks-ticks2) % 15 < 10) {
             g.translate(0, Math.round(-h * 0.01f));
-        }else if(ticks-ticks2 % 30 < 29) {
+        }else if((ticks-ticks2) % 15 < 14) {
             g.translate(0, Math.round(h * 0.01f));
-        }else{
-            czyTrzesienie = false;
+        }else if((ticks - ticks2) > 15){
+            isQuake = false;
+            ticks2 = 0;
         }
     }
 
-    public void paintGrunio(Graphics g, float x, float y)
+    private void paintGrunio(Graphics g, float x, float y)
     {
         int x1 = Math.round(x*w - s * 0.07f);
         int y1 = Math.round(y*h - s * 0.08f);
         Image grunio;
         if (run) {
             if (ticks % 50 < 25) {
-                    if (czyGrunio) {
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1.png");    //Grunio
-                    }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1.png");    //Grunio
-                    }
+                if (isGrunioBlack) {
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run1.png");    //Grunio
+                }else{
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run1.png");    //Grunio
+                }
             } else {
-                    if(czyGrunio){
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2.png");    //Grunio
-                    }else{
-                        grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2.png");    //Grunio
-                    }
+                if(isGrunioBlack){
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_run2.png");    //Grunio
+                }else{
+                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_run2.png");    //Grunio
+                }
             }
         }else{
-                if(czyGrunio){
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze.png");    //Grunio
-                }else{
-                    grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze.png");    //Grunio
-                }
+            if(isGrunioBlack){
+                grunio = Toolkit.getDefaultToolkit().getImage("img/grunio_freeze.png");    //Grunio
+            }else{
+                grunio = Toolkit.getDefaultToolkit().getImage("img/dida_freeze.png");    //Grunio
+            }
         }
         if(direction) {
             g.drawImage(grunio, x1, y1, Math.round(s * 0.14f), Math.round(s * 0.08f), null);
@@ -234,58 +315,137 @@ public class Gruniozerca implements MouseListener, KeyListener
         }
     }
 
-    public void repaint(Graphics g)
+    // =============== RYSOWANIE ŻYC (SERC) =======================
+
+    private void paintLives(Graphics g)
     {
-        if (pause) {
+        if (lives >= 3){
+            g.drawImage(heartRed, Math.round((w * 0.7f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartRed, Math.round((w * 0.8f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartRed, Math.round((w * 0.9f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+        }else if (lives == 2){
+            g.drawImage(heartRed, Math.round((w * 0.7f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartRed, Math.round((w * 0.8f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartGrey, Math.round((w * 0.9f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+        }else if (lives == 1){
+            g.drawImage(heartRed, Math.round((w * 0.7f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartGrey, Math.round((w * 0.8f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+            g.drawImage(heartGrey, Math.round((w * 0.9f)),  Math.round(h*0.05f), Math.round(s * 0.1f), Math.round(h * 0.1f), null);
+        }
+    }
+
+    // ============== MALOWANIE OBRAZU =======================
+    void repaint(Graphics g)
+    {
+        if (pause) {                    //Rysowane w czasie trwania pauzy
+            jframe.getContentPane().setCursor(Cursor.getPredefinedCursor (Cursor.HAND_CURSOR));
             g.drawImage(pauseBackground, 0, 0, w, h, null);
             g.drawImage(exit, Math.round((w-s * 0.7f)/2),  Math.round(h*0.75f), Math.round(s * 0.7f), Math.round(h * 0.2f), null);
-            //g.setColor(Color.red);
-            //g.fillRect( Math.round((w-s * 0.7f)/2),  Math.round(h/2), Math.round(s * 0.7f), Math.round(h * 0.15f));
             g.setColor(Color.white);
             g.setFont(new Font("Arial", 1, Math.round(s * 0.14f)));
-            //g.drawString("WYJŚCIE", Math.round((w-s * 0.7f)/2 + s * 0.03f), Math.round(h/2 + s * 0.14f));
             g.drawString("PAUZA", Math.round((w-s * 0.5f)/2), Math.round(s * 0.14f));
-        }else if (!started){
+        }else if (!started){            //Rysowane przed rozpoczęciem gry
             g.drawImage(startBackground, 0, 0, w, h, null);
+            g.drawImage(logo, Math.round((w-s * 0.95f)/2),  Math.round(h*0.05f), Math.round(s * 0.95f), Math.round(h * 0.2f), null);
             g.setColor(Color.white);
             g.setFont(new Font("Arial", 1, 100));
-            g.drawString("Click to start!", 75, HEIGHT / 2 - 50);
+            g.drawString("Kliknij aby rozpocząć!", Math.round((w-s * 1f)/2), Math.round(s * 0.9f));
+        }else if (isDead){              //Eysowane po zakończeniu gry
+            isRoundEnd = false;
+            jframe.getContentPane().setCursor(Cursor.getPredefinedCursor (Cursor.HAND_CURSOR));
+            g.drawImage(hospital, 0, 0, w, h, null);
+            g.drawImage(exit, Math.round((w-s * 0.7f)/2),  Math.round(h*0.75f), Math.round(s * 0.7f), Math.round(h * 0.2f), null);
+            g.drawImage(repeat, Math.round(w * 0.05f),  Math.round(h*0.05f), Math.round(s * 0.2f), Math.round(s * 0.2f), null);
+            g.setColor(Color.black);
+            g.setFont(new Font("Arial", 1, Math.round(s * 0.14f)));
+            g.drawString("KONIEC", Math.round((w-s * 0.5f)/2), Math.round(s * 0.14f));
+            g.drawString(String.format("WYNIK: %s", (score)), Math.round((w-s * 0.7f)/2), Math.round(s * 0.7f));
+        }else if (isRoundEnd){          //Rysowane po zakończeniu poziomu
+            jframe.getContentPane().setCursor(Cursor.getPredefinedCursor (Cursor.HAND_CURSOR));
+            g.drawImage(holiday, 0, 0, w, h, null);
+            g.drawImage(next, Math.round((w-s * 0.7f)/2),  Math.round(h*0.75f), Math.round(s * 0.7f), Math.round(h * 0.2f), null);
+            g.drawImage(repeat, Math.round(w * 0.05f),  Math.round(h*0.05f), Math.round(s * 0.2f), Math.round(s * 0.2f), null);
+            g.setColor(Color.white);
+            g.setFont(new Font("Arial", 1, Math.round(s * 0.14f)));
+            g.drawString("KONIEC", Math.round((w-s * 0.5f)/2), Math.round(s * 0.14f));
+            g.drawString(String.format("POZIOMU %s", (level)), Math.round((w-s * 0.7f)/2), Math.round(s * 0.28f));
         }
         else{
-            /*
-            float[][] CarrotsCoordiantes = dupsko.getCarrotsCoordiantes((float)ticks/100f);
-            for(int i = 0; i < dupsko.getCarrotsNumber(); i++){
-                paintCarrot(g, CarrotsCoordiantes[0][i], CarrotsCoordiantes[1][i]);
+            if(isRepeat){
+                gruniox = historyGrunioX.remove();          // jesli jest wlaczony "odtworz ponownie" to przypisujemy Gruniowi
+                direction = historyDirection.remove();      // dane z kolejki (jednoczesnie usuwajac już użyte) zeby powstalo
+                run = historyRun.remove();                  // automatyczne odtworzenie przebiegu gry (etapu)
+                isGrunioBlack = historyColor.remove();
             }
-             */
+            jframe.getContentPane().setCursor(blankCursor); // podczas gry nie bedzie byc widoczny kursor myszy
+
+            // dla odpowiedniego poziomu gry zmieniamy tło
+            int backgroundNumber = level%6;
+            Image background = new ImageIcon("img/background" + backgroundNumber + ".jpg").getImage();
+            if(ticks < 10)
+                background = new ImageIcon("img/background" + backgroundNumber + ".jpg").getImage();
+            g.drawImage(background , 0, 0, w, h, null);
+            if (isQuake) quake(g);
             g.drawImage(background, 0, 0, w, h, null);
-            if (czyTrzesienie) trzesienie(g);
-            g.drawImage(background, 0, 0, w, h, null);
-            //float marchewx = 0.5f;
+
+            paintLives(g);
             float carrotSpeed = newLevel.getCarrotsSpeed();
+
             for (int i = 0; i < numberOfCarrots; i++){
-                if (((float) ticks / 100f - CarrotsCoordiantes[1][i]) > 0 && ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]) < 1)
+               /* float newCarrotY;
+                historyCarrotY.add((float) ticks * carrotSpeed - CarrotsCoordinates[1][i]);
+                if(isRepeat)
+                    newCarrotY = historyCarrotY.remove();
+                else
+                    newCarrotY = (float) ticks * carrotSpeed - CarrotsCoordinates[1][i];
+                */
+                if (((float) ticks * carrotSpeed - CarrotsCoordinates[1][i]) > 0 && !isAte[i])
                 {
-                    paintCarrot(g, CarrotsCoordiantes[0][i], (float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]);
-                    //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + ((float) ticks * carrotSpeed - CarrotsCoordiantes[1][i]));
+                    paintCarrot(g, CarrotsCoordinates[0][i], (float) ticks * carrotSpeed - CarrotsCoordinates[1][i], isColor[i]);
+                    if(collision(CarrotsCoordinates[0][i], (float) ticks * carrotSpeed - CarrotsCoordinates[1][i], isColor[i]))
+                    {                           // jesli nastapila kolizja Grunio + marchewki + odpowiedni kolor
+                        isAte[i] = true;        // ustawiamy tę marchewke jako zjedzoną
+                    }
+
+                    if(((float) ticks * carrotSpeed - CarrotsCoordinates[1][i]) >= 1 && !isAte[i]){
+                        try{
+                            String gongFile = "aud/lose.wav";
+                            InputStream in = new FileInputStream(gongFile);
+                            AudioStream audioStream = new AudioStream(in);
+                            AudioPlayer.player.start(audioStream);
+                        }catch (FileNotFoundException ex)
+                        {
+                            System.out.println("Audio Error");
+                        }catch (IOException e) {
+
+                        }
+                        isAte[i] = true;
+                        lives--;
+                        if(lives <= 0) isDead = true;
+                    }
+
                 }
-                //System.out.println("i=" + i + " x=" + CarrotsCoordiantes[0][i] + " y=" + (CarrotsCoordiantes[1][i] - (float)ticks/100f));
+                if(((float) ticks * carrotSpeed - newLevel.carrotY[numberOfCarrots-1]) > 1)
+                {
+                    isRoundEnd = true;
+                }
+
             }
-            //paintCarrot(g, marchewx, marchewy);
+
             g.setColor(Color.white);
-            g.setFont(new Font("Arial", 1, 100));
+            g.setFont(new Font("Arial", 1, Math.round(s * 0.14f)));
 
             if (gameOver) {
-                g.drawString("Game over!", 100, HEIGHT / 2 - 50);
+                g.drawString("Game over!", Math.round((w * 0.5f)/2), Math.round(s * 0.14f));
             }
-            if (!gameOver && started) {
-                g.drawString(String.valueOf(score), WIDTH / 2 - 25, 100);
+            if (!gameOver && started && !isRepeat) {
+                g.drawString(String.valueOf(score), Math.round(w * 0.1f), Math.round(s * 0.14f));
             }
 
             paintGrunio(g, gruniox, 0.82f);
         }
 
-}
+    }
 
     public static void main(String[] args)
     {
@@ -294,9 +454,81 @@ public class Gruniozerca implements MouseListener, KeyListener
 
     @Override
     public void mouseClicked(MouseEvent e) {
-        if (pause){
-            if ( e.getX() < Math.round((w-s * 0.7f)/2) + Math.round(s * 0.7f) && e.getX() >  Math.round((w-s * 0.7f)/2) && e.getY() < Math.round(h*0.75f) + Math.round(s * 0.2f) && e.getY() > Math.round(h*0.75f) ){
+        if ( e.getX() < Math.round((w-s * 0.7f)/2) + Math.round(s * 0.7f) && e.getX() >  Math.round((w-s * 0.7f)/2) && e.getY() < Math.round(h*0.75f) + Math.round(s * 0.2f) && e.getY() > Math.round(h*0.75f) ){
+            if (isRoundEnd){                //Wykonuje się przy kliknięciu przycisku rozpoczęcia kolejnego poziomu
+                try{
+                    String gongFile = "aud/click.wav";
+                    InputStream in = new FileInputStream(gongFile);
+                    AudioStream audioStream = new AudioStream(in);
+                    AudioPlayer.player.start(audioStream);
+                }catch (FileNotFoundException ex)
+                {
+                    System.out.println("Audio Error");
+                }catch (IOException u) {
+
+                }
+                historyGrunioX = new LinkedList<>();
+                historyColor = new LinkedList<>();
+                historyDirection = new LinkedList<>();
+                historyRun = new LinkedList<>();
+
+                run = false;
+                isDead = false;
+                isRoundEnd = false;
+                ticks = 0;
+                ticks2 = -1;
+                isQuake = false;
+                lives = 3;
+                gruniox = 0.5f;
+                isRepeat = false;
+                level++;
+                newLevel = new randomLevel(level, grunioSpeed, 0.2f);         // losuje nowy poziom o nazwie "newLevel"
+
+                CarrotsCoordinates = newLevel.getCarrotsCoordinates();
+                isColor = newLevel.getCarrotColor();
+
+                numberOfCarrots = newLevel.getCarrotsNumber();
+                isAte = new boolean[numberOfCarrots];
+                for(int j = 0; j < numberOfCarrots; j++) isAte[j] = false;
+            }else if (pause || isDead) {
                 System.exit(0);
+            }
+        }
+        if ( e.getX() < Math.round(w * 0.05f) + Math.round(s * 0.2f) && e.getX() >  Math.round(w * 0.05f) && e.getY() < Math.round(h*0.05f) + Math.round(s * 0.2f) && e.getY() > Math.round(h*0.05f) ) {
+            if(isRoundEnd || isDead) {      //Wykonuje się przy kliknięciu przycisku powtórzenia rozgrywki
+                try{
+                    String gongFile = "aud/click.wav";
+                    InputStream in = new FileInputStream(gongFile);
+                    AudioStream audioStream = new AudioStream(in);
+                    AudioPlayer.player.start(audioStream);
+                }catch (FileNotFoundException ex)
+                {
+                    System.out.println("Audio Error");
+                }catch (IOException u) {
+
+                }
+                isDead = false;
+                isRoundEnd = false;
+                ticks = 0;
+                ticks2 = -1;
+                isQuake = false;
+                lives = 3;
+                gruniox = 0.5f;
+                for (int j = 0; j < numberOfCarrots; j++) isAte[j] = false;
+                isRepeat = true;
+            }
+        }
+        if(!started){                     //Wykonuje się przy wcisnięciu myszki na ekranie powitalnym
+            try{
+                String gongFile = "aud/click.wav";
+                InputStream in = new FileInputStream(gongFile);
+                AudioStream audioStream = new AudioStream(in);
+                AudioPlayer.player.start(audioStream);
+            }catch (FileNotFoundException ex)
+            {
+                System.out.println("Audio Error");
+            }catch (IOException u) {
+
             }
         }
         gameOver = false;
@@ -329,58 +561,56 @@ public class Gruniozerca implements MouseListener, KeyListener
     }
 
     @Override
-    public void keyPressed(KeyEvent e) {
+    public void keyPressed(KeyEvent e) {                //Sterowanie gruniem i zmiana kolorów
         if(e.getKeyCode() == KeyEvent.VK_RIGHT && !pause){
             run = true;
             direction = true;
-            prawy = true;
+            right = true;
         }else if(e.getKeyCode() == KeyEvent.VK_LEFT && !pause) {
             run = true;
             direction = false;
-            lewy = true;
+            left = true;
         }
-        if (lewy && prawy){
+        if (left && right){
             run = false;
         }
         if(e.getKeyCode() == KeyEvent.VK_SPACE)
         {
             if(!czySpacja){
-                czyGrunio = !czyGrunio;
+                isGrunioBlack = !isGrunioBlack;
                 czySpacja = true;
             }
         }
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
-        if(e.getKeyCode() == KeyEvent.VK_RIGHT){
-            run = false;
-            prawy = false;
-        }
-        if(e.getKeyCode() == KeyEvent.VK_LEFT){
-            run = false;
-            lewy = false;
-        }
-        if(prawy && !lewy){
-            run = true;
-            direction = true;
-        }else if(lewy && !prawy){
-            run = true;
-            direction = false;
-        }
+    public void keyReleased(KeyEvent e) {               //Zatrzaski
+        if(!isRepeat) {
+            if (e.getKeyCode() == KeyEvent.VK_RIGHT) {
+                run = false;
+                right = false;
+            }
+            if (e.getKeyCode() == KeyEvent.VK_LEFT) {
+                run = false;
+                left = false;
+            }
+            if (right && !left) {
+                run = true;
+                direction = true;
+            } else if (left && !right) {
+                run = true;
+                direction = false;
+            }
 
-        if(e.getKeyCode() == KeyEvent.VK_SPACE)
-        {
-            //jump();
-            czySpacja = false;
+            if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                czySpacja = false;
 
+            }
         }
 
         if(e.getKeyCode() == KeyEvent.VK_ESCAPE && started)
         {
             pause = !pause;
-            //if (pause) timer.stop();
-            //else timer.start();
             renderer.repaint();
         }
     }
